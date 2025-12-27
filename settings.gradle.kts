@@ -16,4 +16,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "CallBlocker"
 include(":app")
-Commit changes
