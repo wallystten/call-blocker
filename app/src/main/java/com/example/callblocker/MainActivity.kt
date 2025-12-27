@@ -30,19 +30,15 @@ class MainActivity : ComponentActivity() {
         hasPermissions = permissions.all { it.value }
         if (hasPermissions) {
             Toast.makeText(this, "Permissões concedidas!", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Algumas permissões foram negadas", Toast.LENGTH_LONG).show()
         }
     }
 
     private val dialerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { result ->
+    ) {
         checkDefaultDialer()
         if (isDefaultDialer) {
-            Toast.makeText(this, "✓ Configurado como app padrão!", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Você precisa selecionar Call Blocker na lista", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Configurado como app padrão!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -108,28 +104,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestDefaultDialer() {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val roleManager = getSystemService(RoleManager::class.java)
-                
-                if (!roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
-                    Toast.makeText(
-                        this, 
-                        "Seu dispositivo não suporta apps de discagem personalizados", 
-                        Toast.LENGTH_LONG
-                    ).show()
-                    return
-                }
-                
-                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
-                dialerLauncher.launch(intent)
-            } else {
-                val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
-                intent.putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
-                dialerLauncher.launch(intent)
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Erro: ${e.message}", Toast.LENGTH_LONG).show()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(RoleManager::class.java)
+            val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
+            dialerLauncher.launch(intent)
         }
     }
 }
@@ -142,9 +120,7 @@ fun CallBlockerScreen(
     onRequestDefaultDialer: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -169,12 +145,6 @@ fun CallBlockerScreen(
             ) {
                 Text("Conceder Permissões")
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Aceite todas as permissões solicitadas",
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
-            )
         }
         
         if (hasPermissions && !isDefaultDialer) {
@@ -184,12 +154,6 @@ fun CallBlockerScreen(
             ) {
                 Text("Definir como App Padrão")
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Selecione 'Call Blocker' na próxima tela",
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
-            )
         }
         
         if (hasPermissions && isDefaultDialer) {
@@ -205,14 +169,12 @@ fun CallBlockerScreen(
                 ) {
                     Text(
                         "✓ Proteção Ativa",
-                        style = MaterialTheme.typography.titleLarge,
-                        textAlign = TextAlign.Center
+                        style = MaterialTheme.typography.titleLarge
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Apenas contatos salvos na agenda podem ligar para você",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
+                        "Apenas contatos salvos podem ligar",
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
@@ -232,23 +194,15 @@ fun StatusCard(title: String, isActive: Boolean) {
         )
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = if (isActive) "✓" else "○",
                 style = MaterialTheme.typography.headlineMedium,
-                color = if (isActive) 
-                    MaterialTheme.colorScheme.primary 
-                else 
-                    MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(end = 16.dp)
             )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium
-            )
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
         }
     }
+}
