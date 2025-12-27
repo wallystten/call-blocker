@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 
@@ -27,6 +28,11 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         hasPermissions = permissions.all { it.value }
+        if (hasPermissions) {
+            Toast.makeText(this, "Permissões concedidas!", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Algumas permissões foram negadas", Toast.LENGTH_LONG).show()
+        }
     }
 
     private val dialerLauncher = registerForActivityResult(
@@ -34,9 +40,9 @@ class MainActivity : ComponentActivity() {
     ) { result ->
         checkDefaultDialer()
         if (isDefaultDialer) {
-            Toast.makeText(this, "Configurado com sucesso!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "✓ Configurado como app padrão!", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "Você precisa selecionar o Call Blocker", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Você precisa selecionar Call Blocker na lista", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -67,41 +73,33 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkPermissions() {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            listOf(
-                Manifest.permission.READ_CONTACTS,
-                Manifest.permission.READ_PHONE_STATE,
-                Manifest.permission.ANSWER_PHONE_CALLS,
-                Manifest.permission.POST_NOTIFICATIONS
-            )
-        } else {
-            listOf(
-                Manifest.permission.READ_CONTACTS,
-                Manifest.permission.READ_PHONE_STATE,
-                Manifest.permission.ANSWER_PHONE_CALLS
-            )
+        val permissions = mutableListOf(
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.ANSWER_PHONE_CALLS
+        )
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
+        
         hasPermissions = permissions.all {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
     }
 
     private fun requestPermissions() {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(
-                Manifest.permission.READ_CONTACTS,
-                Manifest.permission.READ_PHONE_STATE,
-                Manifest.permission.ANSWER_PHONE_CALLS,
-                Manifest.permission.POST_NOTIFICATIONS
-            )
-        } else {
-            arrayOf(
-                Manifest.permission.READ_CONTACTS,
-                Manifest.permission.READ_PHONE_STATE,
-                Manifest.permission.ANSWER_PHONE_CALLS
-            )
+        val permissions = mutableListOf(
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.ANSWER_PHONE_CALLS
+        )
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        permissionLauncher.launch(permissions)
+        
+        permissionLauncher.launch(permissions.toTypedArray())
     }
 
     private fun checkDefaultDialer() {
@@ -113,15 +111,18 @@ class MainActivity : ComponentActivity() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val roleManager = getSystemService(RoleManager::class.java)
+                
                 if (!roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
-                    Toast.makeText(this, "Este dispositivo não suporta apps de discagem personalizados", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this, 
+                        "Seu dispositivo não suporta apps de discagem personalizados", 
+                        Toast.LENGTH_LONG
+                    ).show()
                     return
                 }
                 
-                if (!roleManager.isRoleHeld(RoleManager.ROLE_DIALER)) {
-                    val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
-                    dialerLauncher.launch(intent)
-                }
+                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
+                dialerLauncher.launch(intent)
             } else {
                 val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
                 intent.putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
@@ -141,11 +142,17 @@ fun CallBlockerScreen(
     onRequestDefaultDialer: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("🛡️ Call Blocker", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = "🛡️ Call Blocker",
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center
+        )
         
         Spacer(modifier = Modifier.height(32.dp))
         
@@ -156,19 +163,33 @@ fun CallBlockerScreen(
         Spacer(modifier = Modifier.height(32.dp))
         
         if (!hasPermissions) {
-            Button(onClick = onRequestPermissions, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = onRequestPermissions,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text("Conceder Permissões")
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Conceda todas as permissões solicitadas", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "Aceite todas as permissões solicitadas",
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
+            )
         }
         
         if (hasPermissions && !isDefaultDialer) {
-            Button(onClick = onRequestDefaultDialer, modifier = Modifier.fillMaxWidth()) {
-                Text("Definir como Padrão")
+            Button(
+                onClick = onRequestDefaultDialer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Definir como App Padrão")
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Selecione 'Call Blocker' na próxima tela", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "Selecione 'Call Blocker' na próxima tela",
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
+            )
         }
         
         if (hasPermissions && isDefaultDialer) {
@@ -178,11 +199,22 @@ fun CallBlockerScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
-                Text(
-                    "✓ Proteção Ativa\n\nApenas contatos salvos podem ligar",
+                Column(
                     modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "✓ Proteção Ativa",
+                        style = MaterialTheme.typography.titleLarge,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Apenas contatos salvos na agenda podem ligar para você",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
@@ -190,17 +222,33 @@ fun CallBlockerScreen(
 
 @Composable
 fun StatusCard(title: String, isActive: Boolean) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isActive) 
+                MaterialTheme.colorScheme.primaryContainer 
+            else 
+                MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                if (isActive) "✓" else "○",
-                style = MaterialTheme.typography.headlineSmall,
+                text = if (isActive) "✓" else "○",
+                style = MaterialTheme.typography.headlineMedium,
+                color = if (isActive) 
+                    MaterialTheme.colorScheme.primary 
+                else 
+                    MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(end = 16.dp)
             )
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium
+            )
         }
     }
-}
