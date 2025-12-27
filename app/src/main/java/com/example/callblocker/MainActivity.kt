@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.telecom.TelecomManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,13 +27,17 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         hasPermissions = permissions.all { it.value }
-        if (hasPermissions) requestDefaultDialer()
     }
 
     private val dialerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) {
+    ) { result ->
         checkDefaultDialer()
+        if (isDefaultDialer) {
+            Toast.makeText(this, "Configurado com sucesso!", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Você precisa selecionar o Call Blocker", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,23 +60,48 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        checkDefaultDialer()
+        checkPermissions()
+    }
+
     private fun checkPermissions() {
-        val permissions = listOf(
-            Manifest.permission.READ_CONTACTS,
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.ANSWER_PHONE_CALLS
-        )
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            listOf(
+                Manifest.permission.READ_CONTACTS,
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.ANSWER_PHONE_CALLS,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+        } else {
+            listOf(
+                Manifest.permission.READ_CONTACTS,
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.ANSWER_PHONE_CALLS
+            )
+        }
         hasPermissions = permissions.all {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
     }
 
     private fun requestPermissions() {
-        permissionLauncher.launch(arrayOf(
-            Manifest.permission.READ_CONTACTS,
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.ANSWER_PHONE_CALLS
-        ))
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(
+                Manifest.permission.READ_CONTACTS,
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.ANSWER_PHONE_CALLS,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.READ_CONTACTS,
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.ANSWER_PHONE_CALLS
+            )
+        }
+        permissionLauncher.launch(permissions)
     }
 
     private fun checkDefaultDialer() {
@@ -80,10 +110,25 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestDefaultDialer() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = getSystemService(RoleManager::class.java)
-            val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
-            dialerLauncher.launch(intent)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val roleManager = getSystemService(RoleManager::class.java)
+                if (!roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
+                    Toast.makeText(this, "Este dispositivo não suporta apps de discagem personalizados", Toast.LENGTH_LONG).show()
+                    return
+                }
+                
+                if (!roleManager.isRoleHeld(RoleManager.ROLE_DIALER)) {
+                    val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
+                    dialerLauncher.launch(intent)
+                }
+            } else {
+                val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
+                intent.putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
+                dialerLauncher.launch(intent)
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Erro: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 }
@@ -114,19 +159,29 @@ fun CallBlockerScreen(
             Button(onClick = onRequestPermissions, modifier = Modifier.fillMaxWidth()) {
                 Text("Conceder Permissões")
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Conceda todas as permissões solicitadas", style = MaterialTheme.typography.bodySmall)
         }
         
         if (hasPermissions && !isDefaultDialer) {
             Button(onClick = onRequestDefaultDialer, modifier = Modifier.fillMaxWidth()) {
                 Text("Definir como Padrão")
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Selecione 'Call Blocker' na próxima tela", style = MaterialTheme.typography.bodySmall)
         }
         
         if (hasPermissions && isDefaultDialer) {
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
                 Text(
                     "✓ Proteção Ativa\n\nApenas contatos salvos podem ligar",
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyLarge
                 )
             }
         }
@@ -136,10 +191,16 @@ fun CallBlockerScreen(
 @Composable
 fun StatusCard(title: String, isActive: Boolean) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(if (isActive) "✓" else "○", style = MaterialTheme.typography.headlineSmall)
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(title)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                if (isActive) "✓" else "○",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(end = 16.dp)
+            )
+            Text(title, style = MaterialTheme.typography.titleMedium)
         }
     }
 }
