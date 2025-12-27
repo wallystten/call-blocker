@@ -23,10 +23,31 @@ jobs:
       with:
         gradle-version: 8.2
     
-    - name: Build APK
+    - name: Create wrapper
+      run: gradle wrapper --gradle-version=8.2
+    
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+    
+    - name: Check files
       run: |
-        gradle init --type basic --dsl kotlin --project-name call-blocker
-        mkdir -p app/src/main/java/com/callblocker
-        gradle wrapper
-        echo "android.useAndroidX=true" > gradle.properties
-        ./gradlew assembleDebug || echo "Build may need Android setup"
+        echo "Checking project structure..."
+        ls -la
+        echo "Checking app folder..."
+        ls -la app/ || echo "App folder missing"
+    
+    - name: Build APK (if ready)
+      run: |
+        if [ -f "app/src/main/AndroidManifest.xml" ]; then
+          ./gradlew assembleDebug --stacktrace
+        else
+          echo "Project not ready yet - missing source files"
+        fi
+    
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: app-debug
+        path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: ignore
